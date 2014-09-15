@@ -1,0 +1,135 @@
+breakpoint;
+breakpoint;
+
+alias physicalSP S0;
+physicalSP = ([PTBR + 2*(SP/512)]*512) + (SP%512);
+alias sysCallNo S1;
+sysCallNo = [physicalSP - 1];
+alias fileArg S2;
+fileArg = [physicalSP - 3];  // fileArg is filename for open systemcall and filedescriptor for close systemcall
+if(sysCallNo == 2) then 
+
+	alias fat_index S7;
+	
+	alias i S8;
+	i = 0;
+	while(i< 512) do
+		if([FAT + i] == fileArg) then
+			fat_index = i;
+			break;
+		endif;
+		i = i+8;
+	endwhile;
+	
+	//print "yes";
+
+	if(i==512) then
+		[physicalSP-2] = -1;
+		ireturn ;
+	endif;
+
+
+	//print "yes";
+	
+	i=0;
+	alias SWOFT_index  S3 ;   //SWOFT_index  = System Wide Open File Table index
+ 	
+	SWOFT_index = -2;
+	while(i<128) do 
+		if([FILE_TABLE + i] == fat_index) then   // FILE_TABLE = 1344 ( starting of system wide open file table in memory)
+			SWOFT_index = i;
+		endif;
+		i = i+2;
+	endwhile;
+
+	if(SWOFT_index == -2) then 
+		i=0;
+		while(i<128) do
+			if([FILE_TABLE+i] == -1) then
+				SWOFT_index = i;
+				break;
+			endif;
+			i = i+2;
+		endwhile;
+	
+		if(i == 128) then
+			[physicalSP-2]= -1;
+			ireturn ;
+		endif;
+
+		
+	endif;
+
+	alias currentPID S4;
+	currentPID = (PTBR-1024)/8;
+	
+	alias currentPCB S5;
+	currentPCB = READY_LIST + 32*currentPID;
+	
+	alias PPOFT_index S6;     // PPOFT_index  = Per-Process Open File Table index 
+	
+	i=0;
+	while(i<=14) do
+		if([currentPCB + i + 15]==-1) then
+			PPOFT_index  = i;
+			break;
+		endif;
+		i = i+2;
+	endwhile;
+	
+	if(i>14) then
+		[physicalSP-2]=-1;
+		ireturn ;
+	endif;
+	
+	[currentPCB + PPOFT_index +15 + 0] = SWOFT_index;
+	[currentPCB + PPOFT_index + 15 +1] = 0;
+
+	
+	[FILE_TABLE + SWOFT_index ] = fat_index;
+			
+	[FILE_TABLE + SWOFT_index+1] = [FILE_TABLE + SWOFT_index+1] + 1;
+	breakpoint;
+	[physicalSP-2] = (PPOFT_index/2);
+	ireturn ;
+endif;
+
+
+if(sysCallNo == 3) then
+	if(fileArg<0) then 
+		[physicalSP-2] = -1;
+		ireturn ;
+	endif;
+	if(fileArg > 7) then
+		[physicalSP-2] = -1;
+		ireturn ;
+	endif;
+	
+	alias currentPID S3;
+	currentPID =(PTBR-1024)/8;
+
+	alias currentPCB S4;
+	currentPCB = READY_LIST + 32*currentPID;
+
+	if([currentPCB + fileArg*2 + 15] ==-1) then
+		[physicalSP-2] = -1;
+		ireturn ;
+	endif;
+	
+	alias SWOFT_index S5;
+	SWOFT_index = [currentPCB +2*fileArg +15];
+	
+
+	[FILE_TABLE + SWOFT_index + 1 ] = [FILE_TABLE + SWOFT_index + 1] -1;
+	if([FILE_TABLE +SWOFT_index+1] == 0) then
+		[FILE_TABLE + SWOFT_index ] = -1;
+		
+	endif;
+	[currentPCB + 2*fileArg + 15] = -1;
+	[currentPCB + 2*fileArg + 15 + 1] = -1;
+
+	breakpoint;	
+	[physicalSP-2] =0;
+	ireturn ;
+endif;
+

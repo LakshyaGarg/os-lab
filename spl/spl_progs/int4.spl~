@@ -1,0 +1,64 @@
+alias physicalSP S0;
+physicalSP = ([PTBR + 2*(SP/512)]*512) + (SP%512);
+alias sysCallNo S1;
+sysCallNo = [physicalSP-1];
+alias fd S2;
+fd = [physicalSP-4];
+alias word S3;
+word = [physicalSP-3];
+if(sysCallNo == 5) then
+//	print "yes";
+	if(fd<0) then
+		[physicalSP-2] = -1;
+		ireturn ;
+	endif;
+	
+	//print "yes";
+
+	if(fd>7) then 
+		[physicalSP-2]= -1;
+		ireturn ;
+	endif;
+
+	//print "yes";
+	
+	alias currentPID S4;
+	currentPID = (PTBR-1024)/8;
+	
+	alias currentPCB S5;
+	currentPCB = READY_LIST + 32*currentPID;
+
+//	print fd;
+
+	if([currentPCB + 2*fd + 15] == -1) then
+		[physicalSP-2] =-1;	
+		ireturn ;
+	endif;
+	
+
+	//print "yes";
+
+
+	alias SWOFT_index S6;
+	SWOFT_index = [currentPCB + 2*fd + 15];
+	
+	alias lseek S7;
+	lseek = [currentPCB + 2*fd + 15 + 1];
+	
+	alias fat_index S8;
+	fat_index = [FILE_TABLE + SWOFT_index ] ;
+	
+	//print fat_index;
+
+	alias basic_block_number S9;
+	basic_block_number = [FAT+ 8*fat_index + 2];
+	
+	load(1,basic_block_number);
+
+	
+
+
+	[physicalSP-2]=0;
+	ireturn ;
+endif;
+

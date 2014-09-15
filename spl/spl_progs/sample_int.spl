@@ -1,0 +1,161 @@
+breakpoint;
+breakpoint;
+
+alias physicalSP S0;
+physicalSP = ([PTBR + 2*(SP/512)]*512) + (SP%512);
+alias sysCallNo S1;
+sysCallNo = [physicalSP-1];
+alias fileName S2;
+fileName = [physicalSP-3];
+alias blockNumber S3;
+breakpoint;
+if(sysCallNo == 1)  then // will be always true as we are creaging only for create() system call
+	alias point S4;
+	point = DISK_LIST;
+	alias i S5;
+	i = 0;
+	while(i<=447) do
+		if([point+i] == 0) then 	
+			blockNumber = i;
+			//print fileName;
+			break;
+		endif;
+		i = i+1;
+	endwhile;
+//	print blockNumber;
+	if(i==448) then 
+		[physicalSP-2]=-1;
+		ireturn ;
+	endif;
+
+	i=0;
+	alias fat S6;
+	fat = FAT;
+
+	//print blockNumber;
+	
+	while(i<512) do
+		if([FAT+i] == fileName) then
+			[physicalSP-2] = 0;
+		//	print [FAT+i];
+			ireturn ;
+		endif;
+		i = i+8;
+	endwhile;
+	
+//	print "yes";
+	
+	i=0;
+	
+	while(i<512) do
+		if([FAT+i+2] == -1) then
+			[FAT+i] = fileName;
+			[FAT+i+1] = 0;
+			[FAT+i+2] = blockNumber;
+			//print blockNumber;
+			break;
+		endif;
+		i = i+8;
+	endwhile;
+	
+
+
+
+	if(i == 512) then 
+		[physicalSP-2] = -1;
+		ireturn ;
+	endif;
+
+	
+	load(1,blockNumber);
+	i=0;
+	alias scratchpad S7;
+	scratchpad = 1*512;
+	while( i < 512/2) do
+		[scratchpad+i] = -1;
+		i = i+1;
+	endwhile;
+	
+	store(1,blockNumber);
+
+	[point+blockNumber]=1;
+	store(5,19);
+	store(6,20);
+	[physicalSP-2] = 0;
+	
+	ireturn ;
+
+	//print "yes";
+	
+endif;
+if(sysCallNo == 4) then 
+	alias i S4;
+	i = 0;
+	//print "yes";
+
+	alias fat_index S5;
+	while( i <512 ) do 
+		if([FAT+i] == fileName) then
+			fat_index = i;
+			break;
+		endif;
+		i = i+8;
+	endwhile;
+	
+	if(i == 512) then
+		[physicalSP -2 ] = -1;
+		ireturn ;
+	endif;
+	
+	i = 0;
+	while(i<128) do 
+		if([FILE_TABLE + i] == fat_index) then
+			[physicalSP-2] = -1;
+			ireturn ;
+		endif;
+		i = i +2;
+	endwhile;
+
+
+	//print "yes";	
+
+	load(1,[FAT+fat_index+2]);
+	alias scratchpad S6;
+	scratchpad = 1*512;
+	alias temp_scratchpad S7;
+	alias temp S8;
+	alias j S9;
+	i = 0;
+	breakpoint;
+	while(i<256) do 
+		if([scratchpad+i] !=  -1) then
+			temp = [scratchpad + i];
+			load(1,temp);
+			temp_scratchpad = 1*512;
+			j = 0;
+			while(j<512) do
+				[temp_scratchpad + j] = "";
+				j=j+1;
+			endwhile;
+			store(1,temp);
+			load(1,[FAT+fat_index+2]);
+			scratchpad = 512;
+			[DISK_LIST + i] = 0;
+			[scratchpad+i] = "";
+		endif;
+			i=i+1;
+	endwhile;
+	breakpoint;
+		
+	
+	store(1,[FAT+fat_index+2]);
+	[DISK_LIST + [FAT+fat_index+2]] = 0;
+	[FAT+fat_index+0] = -1;
+	[FAT + fat_index + 1 ] =0;
+	[FAT+fat_index + 2] = -1;
+	store(5,19);
+	store(6,20);
+	[physicalSP-2] = 0;
+	ireturn ;
+endif;
+
